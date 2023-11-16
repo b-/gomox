@@ -8,10 +8,10 @@ import (
 )
 
 const ( // resource getter filters
-	VmFilter      = "vm"
-	StorageFilter = "storage"
-	NodeFilter    = "node"
-	SdnFilter     = "sdn"
+	VmRequestFilter      = "vm"
+	StorageRequestFilter = "storage"
+	NodeRequestFilter    = "node"
+	SdnRequestFilter     = "sdn"
 )
 
 //goland:noinspection GoDeprecation
@@ -36,7 +36,7 @@ func GetVirtualMachineByVMID(ctx context.Context, vmid uint64, client proxmox.Cl
 		return nil, err
 	}
 
-	resources, err := cluster.Resources(ctx, VmFilter)
+	resources, err := cluster.Resources(ctx, VmRequestFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -67,49 +67,43 @@ type getResourceListConfig struct {
 	furtherFilter []string
 }
 
+func (c getResourceListConfig) furtherFilterFunction() []proxmox.ClusterResource {
+
+}
+
 // GetResourceListOption specifies the type of Resources for GetResource to get.
 type GetResourceListOption func(c *getResourceListConfig)
 
-// WithVm makes GetResourceList return VMs.
-func WithVm() GetResourceListOption {
-	return func(c *getResourceListConfig) { c.filter = VmFilter }
-}
+type ResourceFilterFunction func() []proxmox.ClusterResource
 
-// WithStorage makes GetResourceList return Storages.
-func WithStorage() GetResourceListOption {
-	return func(c *getResourceListConfig) { c.filter = StorageFilter }
-}
-
-// WithNode makes GetResourceList return Nodes.
-func WithNode() GetResourceListOption {
-	return func(c *getResourceListConfig) { c.filter = NodeFilter }
-}
-
-// WithSdn makes GetResourceList return SDNs.
-func WithSdn() GetResourceListOption {
-	return func(c *getResourceListConfig) { c.filter = SdnFilter }
-}
-
-// WithAll makes GetResourceList return VMs, Storage, Nodes, and SDNs.
-func WithAll() GetResourceListOption {
-	return func(c *getResourceListConfig) {
-		c.filter = ""
+func FilterRsByType(t string, resources []proxmox.ClusterResource) ResourceFilterFunction {
+	return func() []proxmox.ClusterResource {
+		var rsList []proxmox.ClusterResource
+		var outList []proxmox.ClusterResource
+		for _, rs := range resources {
+			rsList = append(rsList, rs)
+			if rs.Type == t {
+				outList = append(outList, rs)
+			}
+		}
+		return outList
 	}
 }
 
-// WithQemu further filters GetResourceList for Qemu VMs.
-func WithQemu() GetResourceListOption {
-	return func(c *getResourceListConfig) { c.furtherFilter = append(c.furtherFilter, QemuResource) }
+// WithServerFilter makes GetResourceList apply the given filter constant to the query.
+// WithServerFilter(VmServerFilter) or WithServerFilter(StorageServerFilter)
+func WithServerFilter(filter string) GetResourceListOption {
+	return func(c *getResourceListConfig) { c.filter = filter }
 }
 
-// WithLxc further filters GetResourceList for Qemu VMs.
-func WithLxc() GetResourceListOption {
-	return func(c *getResourceListConfig) { c.furtherFilter = append(c.furtherFilter, LxcResource) }
+// WithFurtherFilter makes GetResourceList further filter the returned Resources
+// in order to (for example) return only Resources of the QemuResource type.
+// WithFurtherFilter(QemuResource)
+func WithFurtherFilter(furtherFilter string) GetResourceListOption {
+	return func(c *getResourceListConfig) { c.furtherFilter = append(c.furtherFilter, furtherFilter) }
 }
-
-// WithPool further filters GetResourceList for Pools.
-func WithPool() GetResourceListOption {
-	return func(c *getResourceListConfig) { c.furtherFilter = append(c.furtherFilter, PoolResource) }
+func WithFurtherFilterFunc(function ResourceFilterFunction) GetResourceListOption {
+	return func(c *getResourceListConfig) { c.furtherFilterFunction = function }
 }
 
 func GetResourceList(
@@ -117,9 +111,11 @@ func GetResourceList(
 	client proxmox.Client,
 	opts ...GetResourceListOption,
 ) (
-	rsList []*proxmox.ClusterResource,
+	outList []*proxmox.ClusterResource,
 	err error,
 ) {
+	var rsList []*proxmox.ClusterResource
+
 	c := &getResourceListConfig{
 		filter:        "",
 		furtherFilter: nil,
@@ -137,20 +133,26 @@ func GetResourceList(
 		return nil, err
 	}
 	for _, rs := range resources {
-		if err != nil {
-			return nil, err
-		}
 		rsList = append(rsList, rs)
+		if c.furtherFilter != nil {
+			for _, f := range c.furtherFilter {
+				if rs.Type == f {
+					outList = append(outList, rs)
+				}
+			}
+		} else {
+			outList = append(outList, rs)
+		}
 	}
 
-	return rsList, nil
+	return outList, nil
 }
 
 func GetVirtualMachineList(ctx context.Context, client proxmox.Client) (vmList []*proxmox.VirtualMachine, err error) {
 	var node *proxmox.Node
 	var vm *proxmox.VirtualMachine
 
-	resources, err := GetResourceList(ctx, client, VmFilter)
+	resources, err := GetResourceList(ctx, client, WithServerFilter(VmRequestFilter))
 	var rsList []*proxmox.ClusterResource
 	for _, rs := range resources {
 		node, err = client.Node(ctx, rs.Node)
