@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
-	"github.com/kr/pretty"
 	"github.com/luthermonson/go-proxmox"
 	"github.com/sirupsen/logrus"
 )
@@ -219,25 +218,6 @@ func WaitTask(ctx context.Context, task *proxmox.Task, opts ...WaitOption) (err 
 
 	for {
 		select {
-		/*
-			case <-timeoutExpired:
-				watch <- taskMsgPrefix(*task, fmt.Sprintln("Timeout expired!"))
-				if c.pollingConfig.stopTaskOnTimeout {
-					_ = task.Stop(ctx)
-				}
-				break
-
-		*/
-
-		/*
-			case <-ticker.C:
-				polledStatus, _ := TaskStatus(ctx, *task)
-				if task.IsRunning {
-					logrus.Debugln(polledStatus)
-				}
-				return
-
-		*/
 
 		// receive new task data
 		case ln, ok := <-watch:
@@ -248,9 +228,16 @@ func WaitTask(ctx context.Context, task *proxmox.Task, opts ...WaitOption) (err 
 			newMsg = taskMsgPrefix(*task, ln)
 			if msg != newMsg {
 				msg = newMsg
-				// logrus.Infoln(msg)
 				s.Suffix = " " + msg
+				logrus.Debugln(msg)
+				taskStatus, err := TaskStatus(ctx, *task)
+				if err != nil {
+					logrus.Debugln(taskStatus)
+					return err
+				}
+
 			}
+
 		}
 		if watch == nil {
 			logrus.Infoln(msg)
@@ -268,10 +255,11 @@ func taskMsgPrefix(task proxmox.Task, msg string) string {
 // TaskStatus updates the task and returns a message explaining the task's
 // status
 func TaskStatus(ctx context.Context, task proxmox.Task) (string, error) {
-	err := task.Ping(ctx)                               // Update task.
-	msg := fmt.Sprintf("%#v\n", pretty.Formatter(task)) // TODO: Improve task status formatting
+	err := task.Ping(ctx) // Update task.
+	// msg := fmt.Sprintf("%#v\n", pretty.Formatter(task)) // TODO: Improve task status formatting
+	msg := fmt.Sprintf("%s\n", task.Status)
 	if task.IsFailed {
-		err = fmt.Errorf("the task has failed")
+		err = fmt.Errorf("Task failed. Error: %s\n", task.ExitStatus)
 	}
 	return msg, err
 }

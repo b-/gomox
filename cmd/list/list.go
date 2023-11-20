@@ -56,7 +56,7 @@ func list(c *cli.Context) error {
 	// simple table with zero customizations
 	tw := table.NewWriter()
 	// append a header row
-	tw.AppendHeader(table.Row{"VMID", "Name", "Type", "Status", "Mem (MB)", "BootDisk (GB)", "PID"})
+	tw.AppendHeader(table.Row{"VMID", "Name", "Status", "Mem (MB)", "BootDisk (GB)", "PID"})
 	// append some data rows
 
 	for _, vm := range rsList {
@@ -72,7 +72,7 @@ func list(c *cli.Context) error {
 			},
 		)
 	}
-	tw.Style().Options = table.OptionsNoBordersAndSeparators
+	// tw.Style().Options = table.OptionsNoBordersAndSeparators
 
 	fmt.Println(tw.Render())
 	return nil
