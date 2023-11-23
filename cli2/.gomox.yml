@@ -1,0 +1,12 @@
+pve_user: root
+pve_password: s97nf6g1
+pve_realm: pam
+#pve_url: 'https://pve.example.com:8006/api2/json' # if unspecified it is evaluated internally to `${PVE_URI_SCHEME}://${PVE_HOST}:${PVE_PORT}/api2/json`
+pve_uri_scheme: https # defaults to https if unspecified
+# note that I haven't added options for working without a valid certificate or over unencrypted http yet.
+#pve_host: n1.pc.perchnet.dn42
+pve_host: dn42.macpro.pve.ibeep.com
+pve_port: 8006
+wait_timeout: 30
+debug: true
+
