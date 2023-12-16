@@ -3,9 +3,9 @@ package list
 import (
 	"fmt"
 
-	"github.com/b-/gomox/util"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/luthermonson/go-proxmox"
+	"github.com/perchnet/gomox/util"
 	"github.com/urfave/cli/v2"
 )
 
@@ -20,7 +20,24 @@ var Command = &cli.Command{
 	Name:   "list",
 	Usage:  "Lists virtual machines",
 	Action: list,
-	Flags:  []cli.Flag{},
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:     "type",
+			Category: "",
+			// DefaultText: "both",
+			FilePath:    "",
+			Usage:       "`qemu|lxc|both`",
+			Required:    false,
+			Hidden:      false,
+			HasBeenSet:  false,
+			Value:       "both",
+			Destination: nil,
+			Aliases:     nil,
+			EnvVars:     nil,
+			TakesFile:   false,
+			Action:      nil,
+		},
+	},
 }
 
 func list(c *cli.Context) error {
@@ -32,7 +49,7 @@ func list(c *cli.Context) error {
 			Realm:    c.String("pverealm"),
 		},
 	)
-	rsList, err := util.GetVirtualMachineList(c.Context, client)
+	rsList, err := util.GetVirtualMachineList(c.Context, client, util.QemuResource)
 	if err != nil {
 		return err
 	}
@@ -44,16 +61,19 @@ func list(c *cli.Context) error {
 
 	for _, vm := range rsList {
 		// if vm.
+
 		tw.AppendRow(
 			table.Row{
 				// vmid,name,status,mem,boot,pid
 				// https://git.proxmox.com/?p=qemu-server.git;a=blob;f=PVE/CLI/qm.pm;h=b17b4fe25d5bd21e9fe188e82998972b1dc29c36;hb=HEAD#l1001
 				int(vm.VMID), vm.Name, vm.Status, vm.MaxMem / Megabyte,
 				float64(vm.MaxDisk) / float64(Gigabyte),
-				// uint64(vm.PID),
+				uint64(vm.PID),
 			},
 		)
 	}
-	fmt.Print(tw.Render())
+	tw.Style().Options = table.OptionsNoBordersAndSeparators
+
+	fmt.Println(tw.Render())
 	return nil
 }
